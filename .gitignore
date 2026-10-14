@@ -10,3 +10,4 @@ result-*
 
 .venv/
 .env
+.npm-local/
