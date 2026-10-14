@@ -1,6 +1,6 @@
 
 {
-  description = "Local AI agent development environment";
+  description = "OpenHands Agent Canvas on NixOS";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -20,20 +20,13 @@
           sqlite
         ];
 
-        # Pin application versions here.
         canvasVersion = "1.27.1";
-
       in {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
-            # Python
             python312
             uv
-
-            # JavaScript
             nodejs_24
-
-            # Development tools
             git
             gcc
             pkg-config
@@ -43,27 +36,12 @@
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libraries;
 
           shellHook = ''
-            # Resolve paths relative to the flake directory.
             export OPENHANDS_ENV_ROOT="$PWD"
-            export UV_PROJECT_ENVIRONMENT="$OPENHANDS_ENV_ROOT/.venv"
             export OPENHANDS_NPM_PREFIX="$OPENHANDS_ENV_ROOT/.npm-local"
 
-            export PATH="$UV_PROJECT_ENVIRONMENT/bin:$OPENHANDS_NPM_PREFIX/bin:$PATH"
+            export PATH="$OPENHANDS_NPM_PREFIX/bin:$PATH"
 
-            # Install OpenHands CLI.
-            if [ ! -x "$UV_PROJECT_ENVIRONMENT/bin/openhands" ]; then
-              echo "Installing OpenHands CLI..."
-
-              uv venv \
-                --python python3.12 \
-                "$UV_PROJECT_ENVIRONMENT"
-
-              uv pip install \
-                --python "$UV_PROJECT_ENVIRONMENT/bin/python" \
-                openhands || echo "WARNING: CLI installation failed"
-            fi
-
-            # Install Agent Canvas locally.
+            # Install Canvas independently of the Python CLI.
             if [ ! -x "$OPENHANDS_NPM_PREFIX/bin/agent-canvas" ]; then
               echo "Installing OpenHands Agent Canvas..."
 
@@ -73,19 +51,22 @@
                 --prefix "$OPENHANDS_NPM_PREFIX" \
                 --no-audit \
                 --no-fund \
-                "@openhands/agent-canvas@${canvasVersion}" \
-                || echo "WARNING: Agent Canvas installation failed"
+                "@openhands/agent-canvas@${canvasVersion}"
+
+              if [ ! -x "$OPENHANDS_NPM_PREFIX/bin/agent-canvas" ]; then
+                echo "ERROR: Agent Canvas executable not found."
+                echo "Check npm installation output."
+                return 1
+              fi
             fi
 
-            # Reuse OpenAI-compatible configuration if available.
-            if [ -z "''${LLM_API_KEY:-}" ] && [ -n "''${PURDUE_GENAI_API_KEY:-}" ]; then
+            if [ -z "''${LLM_API_KEY:-}" ] &&
+               [ -n "''${PURDUE_GENAI_API_KEY:-}" ]; then
               export LLM_API_KEY="$PURDUE_GENAI_API_KEY"
             fi
 
             echo ""
-            echo "======================================"
-            echo " OpenHands Development Environment"
-            echo "======================================"
+            echo "OpenHands Agent Canvas environment ready."
             echo ""
 
             echo "LLM Configuration:"
@@ -101,15 +82,10 @@
             echo ""
             echo "Available commands:"
             echo ""
+            echo "Run:"
             echo "  agent-canvas"
-            echo "    Modern web UI (http://localhost:8000)"
             echo ""
-            echo "  openhands --override-with-envs"
-            echo "    OpenHands terminal interface"
-            echo ""
-            echo "  openhands web --host 127.0.0.1 --port 12000"
-            echo "    Terminal-style browser interface"
-            echo ""
+            echo "UI: http://localhost:8000"
           '';
         };
       });
