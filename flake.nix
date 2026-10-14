@@ -54,6 +54,17 @@
             echo ""
             echo "Development environment ready."
             echo ""
+            echo "LLM Configuration:"
+            echo "  Model:    ''${LLM_MODEL:-<unset>}"
+            echo "  Base URL: ''${LLM_BASE_URL:-<unset>}"
+
+            if [ -n "''${LLM_API_KEY:-}" ]; then
+              echo "  API Key:  ******** (set)"
+            else
+              echo "  API Key:  <unset>"
+            fi
+
+            echo ""
             echo "Commands:"
             echo "  openhands --override-with-envs"
             echo "  openhands web --host 127.0.0.1 --port 12000"
