@@ -1,3 +1,4 @@
+
 {
   description = "Local AI agent development environment";
 
@@ -18,6 +19,10 @@
           libffi
           sqlite
         ];
+
+        # Pin application versions here.
+        canvasVersion = "1.27.1";
+
       in {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
@@ -38,22 +43,51 @@
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath libraries;
 
           shellHook = ''
-            export UV_PROJECT_ENVIRONMENT="$PWD/.venv"
+            # Resolve paths relative to the flake directory.
+            export OPENHANDS_ENV_ROOT="$PWD"
+            export UV_PROJECT_ENVIRONMENT="$OPENHANDS_ENV_ROOT/.venv"
+            export OPENHANDS_NPM_PREFIX="$OPENHANDS_ENV_ROOT/.npm-local"
 
-            # Install OpenHands if not already installed.
+            export PATH="$UV_PROJECT_ENVIRONMENT/bin:$OPENHANDS_NPM_PREFIX/bin:$PATH"
+
+            # Install OpenHands CLI.
             if [ ! -x "$UV_PROJECT_ENVIRONMENT/bin/openhands" ]; then
               echo "Installing OpenHands CLI..."
-              uv venv --python python3.12 "$UV_PROJECT_ENVIRONMENT"
+
+              uv venv \
+                --python python3.12 \
+                "$UV_PROJECT_ENVIRONMENT"
+
               uv pip install \
                 --python "$UV_PROJECT_ENVIRONMENT/bin/python" \
-                openhands
+                openhands || echo "WARNING: CLI installation failed"
             fi
 
-            export PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
+            # Install Agent Canvas locally.
+            if [ ! -x "$OPENHANDS_NPM_PREFIX/bin/agent-canvas" ]; then
+              echo "Installing OpenHands Agent Canvas..."
+
+              mkdir -p "$OPENHANDS_NPM_PREFIX"
+
+              npm install \
+                --prefix "$OPENHANDS_NPM_PREFIX" \
+                --no-audit \
+                --no-fund \
+                "@openhands/agent-canvas@${canvasVersion}" \
+                || echo "WARNING: Agent Canvas installation failed"
+            fi
+
+            # Reuse OpenAI-compatible configuration if available.
+            if [ -z "''${LLM_API_KEY:-}" ] && [ -n "''${PURDUE_GENAI_API_KEY:-}" ]; then
+              export LLM_API_KEY="$PURDUE_GENAI_API_KEY"
+            fi
 
             echo ""
-            echo "Development environment ready."
+            echo "======================================"
+            echo " OpenHands Development Environment"
+            echo "======================================"
             echo ""
+
             echo "LLM Configuration:"
             echo "  Model:    ''${LLM_MODEL:-<unset>}"
             echo "  Base URL: ''${LLM_BASE_URL:-<unset>}"
@@ -65,11 +99,19 @@
             fi
 
             echo ""
-            echo "Commands:"
+            echo "Available commands:"
+            echo ""
+            echo "  agent-canvas"
+            echo "    Modern web UI (http://localhost:8000)"
+            echo ""
             echo "  openhands --override-with-envs"
+            echo "    OpenHands terminal interface"
+            echo ""
             echo "  openhands web --host 127.0.0.1 --port 12000"
+            echo "    Terminal-style browser interface"
             echo ""
           '';
         };
       });
 }
+
